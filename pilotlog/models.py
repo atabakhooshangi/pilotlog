@@ -1,0 +1,138 @@
+from django.db import models
+
+
+class BaseModel(models.Model):
+    Record_Modified = models.IntegerField(null=False, blank=False)
+
+    class Meta:
+        abstract = True
+        ordering = ('-Record_Modified',)
+
+
+class Aircraft(BaseModel):
+    Fin = models.CharField(max_length=100, null=True, blank=True)
+    Sea = models.BooleanField(default=False)
+    TMG = models.BooleanField(default=False)
+    Efis = models.BooleanField(default=False)
+    FNPT = models.IntegerField(null=True, blank=True)
+    Make = models.CharField(max_length=100, null=True, blank=True)
+    Run2 = models.BooleanField(default=False)
+    Class = models.IntegerField(null=True, blank=True)
+    Model = models.CharField(max_length=100, null=True, blank=True)
+    Power = models.IntegerField(null=True, blank=True)
+    Seats = models.IntegerField(null=True, blank=True)
+    Active = models.BooleanField(default=False)
+    Kg5700 = models.BooleanField(default=False)
+    Rating = models.CharField(max_length=100, null=True, blank=True)
+    Company = models.CharField(max_length=100, null=True, blank=True)
+    Complex = models.BooleanField(default=False)
+    CondLog = models.IntegerField(null=True, blank=True)
+    FavList = models.BooleanField(default=False)
+    Category = models.IntegerField()
+    HighPerf = models.BooleanField(default=False)
+    SubModel = models.CharField(null=True, blank=True)
+    Aerobatic = models.BooleanField(default=False)
+    RefSearch = models.CharField(null=True, blank=True)
+    Reference = models.CharField(null=True, blank=True)
+    Tailwheel = models.BooleanField(default=False)
+    DefaultApp = models.IntegerField(null=True, blank=True)
+    DefaultLog = models.IntegerField(null=True, blank=True)
+    DefaultOps = models.IntegerField(null=True, blank=True)
+    DeviceCode = models.IntegerField(null=True, blank=True)
+    AircraftCode = models.CharField(max_length=100, null=False, blank=False, db_index=True, unique=True)
+    DefaultLaunch = models.IntegerField(null=True, blank=True)
+
+
+
+
+class FlightManager(models.Manager):
+    def create(self, **kwargs):
+        aircraft_code = kwargs.pop('AircraftCode', None)
+        kwargs['Aircraft_id'] = aircraft_code
+        flight = super().create(**kwargs)
+        return flight
+
+
+
+class Flight(BaseModel):
+    def __init__(self,*args,**kwargs):
+        if 'AircraftCode' in kwargs:
+            aircraft_id = kwargs.pop('AircraftCode')
+            kwargs['Aircraft_id'] = aircraft_id
+        super(Flight, self).__init__(*args,**kwargs)
+    Aircraft= models.ForeignKey(to='AirCraft',on_delete=models.DO_NOTHING,to_field='AircraftCode',db_column='AircraftCode')
+    PF = models.BooleanField(default=False)
+    Pax = models.IntegerField(null=True, blank=True)
+    Fuel = models.IntegerField(null=True, blank=True)
+    DeIce = models.BooleanField(default=False)
+    Route = models.CharField(max_length=250, null=True, blank=True)
+    ToDay = models.IntegerField(null=True, blank=True)
+    minU1 = models.IntegerField(null=True, blank=True)
+    minU2 = models.IntegerField(null=True, blank=True)
+    minU3 = models.IntegerField(null=True, blank=True)
+    minU4 = models.IntegerField(null=True, blank=True)
+    minXC = models.IntegerField(null=True, blank=True)
+    ArrRwy = models.CharField(max_length=250, null=True, blank=True)
+    DepRwy = models.CharField(max_length=250, null=True, blank=True)
+    LdgDay = models.IntegerField(null=True, blank=True)
+    LiftSW = models.IntegerField(null=True, blank=True)
+    P1Code = models.CharField(max_length=250, null=True, blank=True)
+    P2Code = models.CharField(max_length=250, null=True, blank=True)
+    P3Code = models.CharField(max_length=250, null=True, blank=True)
+    P4Code = models.CharField(max_length=250, null=True, blank=True)
+    Report = models.CharField(max_length=250, null=True, blank=True)
+    TagOps = models.CharField(max_length=250, null=True, blank=True)
+    ToEdit = models.BooleanField(default=False)
+    minAIR = models.IntegerField(null=True, blank=True)
+    minCOP = models.IntegerField(null=True, blank=True)
+    minIFR = models.IntegerField(null=True, blank=True)
+    minIMT = models.IntegerField(null=True, blank=True)
+    minPIC = models.IntegerField(null=True, blank=True)
+    minREL = models.IntegerField(null=True, blank=True)
+    minSFR = models.IntegerField(null=True, blank=True)
+    ArrCode = models.CharField(max_length=250, null=True, blank=True)
+    DateUTC = models.CharField(max_length=250, null=True, blank=True)
+    DepCode = models.CharField(max_length=250, null=True, blank=True)
+    HobbsIn = models.IntegerField(null=True, blank=True)
+    Holding = models.IntegerField(null=True, blank=True)
+    Pairing = models.CharField(max_length=250, null=True, blank=True)
+    Remarks = models.CharField(max_length=250, null=True, blank=True)
+    SignBox = models.IntegerField(null=True, blank=True)
+    ToNight = models.IntegerField(null=True, blank=True)
+    UserNum = models.IntegerField(null=True, blank=True)
+    minDUAL = models.IntegerField(null=True, blank=True)
+    minEXAM = models.IntegerField(null=True, blank=True)
+    CrewList = models.CharField(max_length=250, null=True, blank=True)
+    DateBASE = models.DateField(null=True, blank=True)
+    FuelUsed = models.IntegerField(null=True, blank=True)
+    HobbsOut = models.IntegerField(null=True, blank=True)
+    LdgNight = models.IntegerField(null=True, blank=True)
+    NextPage = models.BooleanField(default=False)
+    TagDelay = models.CharField(max_length=250, null=True, blank=True)
+    Training = models.CharField(max_length=250, null=True, blank=True)
+    UserBool = models.BooleanField(default=False)
+    UserText = models.CharField(max_length=250, null=True, blank=True)
+    minINSTR = models.IntegerField(null=True, blank=True)
+    minNIGHT = models.IntegerField(null=True, blank=True)
+    minPICUS = models.IntegerField(null=True, blank=True)
+    minTOTAL = models.IntegerField(null=True, blank=True)
+    ArrOffset = models.IntegerField(null=True, blank=True)
+    DateLOCAL = models.DateField(null=True, blank=True)
+    DepOffset = models.IntegerField(null=True, blank=True)
+    TagLaunch = models.CharField(max_length=250, null=True, blank=True)
+    TagLesson = models.CharField(max_length=250, null=True, blank=True)
+    ToTimeUTC = models.IntegerField(null=True, blank=True)
+    ArrTimeUTC = models.IntegerField(null=True, blank=True)
+    BaseOffset = models.IntegerField(null=True, blank=True)
+    DepTimeUTC = models.IntegerField(null=True, blank=True)
+    FlightCode = models.CharField(max_length=100, null=False, blank=False, db_index=True, unique=True)
+    LdgTimeUTC = models.IntegerField(null=True, blank=True)
+    FuelPlanned = models.IntegerField(null=True, blank=True)
+    NextSummary = models.BooleanField(default=False)
+    TagApproach = models.CharField(max_length=250, null=True, blank=True)
+    ArrTimeSCHED = models.IntegerField(null=True, blank=True)
+    DepTimeSCHED = models.IntegerField(null=True, blank=True)
+    FlightNumber = models.CharField(max_length=250, null=True, blank=True)
+    FlightSearch = models.CharField(max_length=250, null=True, blank=True)
+
+    objects = FlightManager()
