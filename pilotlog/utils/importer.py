@@ -1,12 +1,13 @@
-from abc import ABC, abstractmethod
-
-from django.apps import apps
-
 import json
-
-# Base class for data extraction
+import logging
+from abc import ABC, abstractmethod
+from django.apps import apps
 from django.conf import settings
-from django.db import IntegrityError, models
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, models, transaction
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
 class BaseImporter(ABC):
@@ -17,10 +18,6 @@ class BaseImporter(ABC):
 
     @abstractmethod
     def format_serializer(self, data):
-        raise NotImplementedError
-
-    @abstractmethod
-    def do_import(self, data):
         raise NotImplementedError
 
 
@@ -39,15 +36,15 @@ class JSONImporter(BaseImporter):
                 unescaped_json_string = json_string.encode().decode('unicode_escape')
                 data = json.loads(unescaped_json_string)
             return data
-        except FileNotFoundError as e:
-            print("File not found:", file_name)
-            raise e
-        except json.JSONDecodeError as e:
-            print("Error decoding JSON:", file_name)
-            raise e
+        except FileNotFoundError:
+            logger.error("File not found: %s", file_name)
+            raise
+        except json.JSONDecodeError:
+            logger.error("Error decoding JSON: %s", file_name)
+            raise
         except Exception as e:
-            print("An error occurred:", e)
-            raise e
+            logger.error("An error occurred: %s", e)
+            raise
 
     def format_serializer(self, data: list):
         if not isinstance(data, list):
@@ -55,23 +52,20 @@ class JSONImporter(BaseImporter):
         if len(data) == 0:
             return None
 
-        for item in data:
-            table_key = item['table']
-            app_label = next((model._meta.app_label for model in apps.get_models() if model.__name__ == table_key), None)
-            # meta_data = item['meta']
-
-            # if table_key == 'Aircraft':
-            #     print(table_key,app_label)
-            item['table'] = f"{app_label}.{table_key}"
-
-            # Append the meta data to the corresponding list
-            # if app_label is not None:
-            #     if key not in result_dict:result_dict[f"{app_label}.{table_key}"] = []
-            #     result_dict[f"{app_label}.{table_key}"].append(meta_data)
-        return data
-
-    def do_import(self, formatted_data):
-        return self.persister.persist_data(formatted_data)
+        grouped_data = {}
+        s = []
+        for record in data:
+            table_name = record['table'].lower()
+            app_label = next((model._meta.app_label for model in apps.get_models() if model.__name__.lower() == table_name), None)
+            if app_label and f"{app_label}.{table_name}" not in s:
+                s.append(f"{app_label}.{table_name}")
+            if app_label is not None:
+                table_key = f"{app_label}.{table_name}"
+                if table_key not in grouped_data:
+                    grouped_data[table_key] = []
+                grouped_data[table_key].append(record['meta'])
+        print(s)
+        return grouped_data
 
     def __call__(self, file_name):
         """
@@ -81,37 +75,7 @@ class JSONImporter(BaseImporter):
         """
         data = self.parser(file_name)
         formatted_data = self.format_serializer(data)
-        return self.do_import(formatted_data)
-
-
-class CSVImporter(BaseImporter):
-    CSV_BASE_DIR = None
-
-    def __init__(self):
-        self.persister = CSVPersister()
-
-    def parser(self, file_name: str):
-        pass
-
-    def format_serializer(self, data):
-        pass
-
-    def do_import(self, data):
-        pass
-
-
-class XMLImporter(BaseImporter):
-    XML_BASE_DIR = None
-    def __init__(self):
-        self.persister = XmlPersister()
-    def parser(self, file_name: str):
-        pass
-
-    def format_serializer(self, data):
-        pass
-
-    def do_import(self, data):
-        pass
+        return self.persister.persist_data(formatted_data)
 
 
 # Class for persisting data
@@ -122,53 +86,37 @@ class Persister(ABC):
         pass
 
 
-class JsonPersister(Persister):
-
-
-
+class JsonPersister:
     def persist_data(self, data):
-
-        for i in data:
-            # print(model_app)
-            try:
-                model:models.Model = apps.get_model(i.get('table'))
-                meta_data = i.get('meta')
-                model.objects.create(**meta_data)
-                # bulk_models = []
-                # for val in vals:
-                #     bulk_models.append(model(**val))
-                # model.objects.bulk_create(bulk_models)
-            except IntegrityError:
-                print(f'Could not load {i.get("table")}')
-            except Exception as e:
-                print(e)
-        return 'data persisted'
-
-
-class CSVPersister(Persister):
-    def persist_data(self, data):
-        pass
-
-
-class XmlPersister(Persister):
-    def persist_data(self, data):
-        pass
+        for model_path, entries in data.items():
+            model = apps.get_model(model_path)
+            objects_to_create = [model(**entry) for entry in entries]  # Initialize before the loop
+            if objects_to_create:  # Proceed only if there are objects to create
+                try:
+                    with transaction.atomic():
+                        model.objects.bulk_create(objects_to_create)
+                    logger.info("Data import completed successfully for %s records.", len(objects_to_create))
+                except Exception as e:
+                    logger.error("Unexpected error persisting data for %s: %s", model_path, e)
+            else:
+                logger.info("No valid objects to create for %s.", model_path)
+        return
 
 
 class ImporterFactory:
     @staticmethod
     def get_importer(file_name: str) -> BaseImporter:
-        # Detect the file format from the file extension
+        """Factory method to get the appropriate importer based on file type."""
         file_extension = file_name.split('.')[-1].lower()
 
         supported_importers = {
             'json': JSONImporter(),
-            'csv': CSVImporter(),
-            'xml': XMLImporter(),
+            # Any importer can be added later
+
         }
 
         importer = supported_importers.get(file_extension)
         if importer is None:
-            raise ValueError('The format is not supported yet')
+            raise ValueError("Unsupported file type: %s , supported types are %s", file_extension, supported_importers.keys())
 
         return importer
