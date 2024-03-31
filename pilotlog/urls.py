@@ -4,9 +4,9 @@ from .views import ImportExportAPIView
 
 router = routers.DefaultRouter()
 router.register(
-    prefix='imex',
+    prefix='pilotlog',
     viewset=ImportExportAPIView,
-    basename='imex'
+    basename='pilotlog'
 )
 
 url_patterns = [
